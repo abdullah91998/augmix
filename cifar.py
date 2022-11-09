@@ -14,8 +14,7 @@
 # ==============================================================================
 """Main script to launch AugMix training on CIFAR-10/100.
 
-Supports WideResNet, AllConv, ResNeXt models on CIFAR-10 and CIFAR-100 as well
-as evaluation on CIFAR-10-C and CIFAR-100-C.
+Supports WideResNet, AllConv, ResNeXt models on CIFAR-10 and CIFAR-100 as was evaluation on CIFAR-10-C and CIFAR-100-C.
 
 Example usage:
   `python cifar.py`
@@ -36,10 +35,14 @@ from third_party.WideResNet_pytorch.wideresnet import WideResNet
 
 import torch
 import torch.backends.cudnn as cudnn
+from torch.utils.tensorboard import SummaryWriter
+import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import datasets
 from torchvision import transforms
-
+from torch import optim
+from torchvision.models import resnet18
+from torchvision.models import convnext_tiny
 parser = argparse.ArgumentParser(
     description='Trains a CIFAR Classifier',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -54,8 +57,16 @@ parser.add_argument(
     '-m',
     type=str,
     default='wrn',
-    choices=['wrn', 'allconv', 'densenet', 'resnext'],
+    choices=['wrn', 'allconv', 'densenet', 'resnext', 'resnet18', 'convnext_tiny'],
     help='Choose architecture.')
+parser.add_argument(
+    '--pretrained',
+    '-pt',
+    action='store_true',
+    #type=bool,
+    #default=True,
+    #choices=[True,False],
+    help='choose pretrained or not pretrained')
 # Optimization options
 parser.add_argument(
     '--epochs', '-e', type=int, default=100, help='Number of epochs to train.')
@@ -112,7 +123,7 @@ parser.add_argument(
     '--save',
     '-s',
     type=str,
-    default='./snapshots',
+    default='./snapshots/Expereiment8',
     help='Folder to save checkpoints.')
 parser.add_argument(
     '--resume',
@@ -286,6 +297,7 @@ def test_c(net, test_data, base_path):
   return np.mean(corruption_accs)
 
 
+
 def main():
   torch.manual_seed(1)
   np.random.seed(1)
@@ -338,13 +350,24 @@ def main():
     net = AllConvNet(num_classes)
   elif args.model == 'resnext':
     net = resnext29(num_classes=num_classes)
+  elif args.model == 'resnet18':
+    net = resnet18(pretrained=args.pretrained)
+    num_ftrs=net.fc.in_features
+    net.fc=nn.Linear(in_features=num_ftrs, out_features=num_classes, bias=True)
+#  elif args.model == 'convnext_tiny':
+#    net = timm.create_model('convnext_tiny',pretrained=True, num_classes=num_classes)
+  elif args.model == 'convnext_tiny':
+    #import ipdb;ipdb.set_trace()
+    net = convnext_tiny(pretrained = args.pretrained)
+    net.classifier[2] = nn.Linear(in_features=net.classifier[2].in_features, out_features=num_classes, bias=True)
 
-  optimizer = torch.optim.SGD(
+  #optimizer = torch.optim.SGD(
+  optimizer = torch.optim.AdamW(
       net.parameters(),
-      args.learning_rate,
-      momentum=args.momentum,
-      weight_decay=args.decay,
-      nesterov=True)
+      lr=args.learning_rate,
+      #momentum=args.momentum,
+      weight_decay=args.decay,)
+      #nesterov=True)
 
   # Distribute model across all visible GPUs
   net = torch.nn.DataParallel(net).cuda()
@@ -371,13 +394,17 @@ def main():
     print('Mean Corruption Error: {:.3f}'.format(100 - 100. * test_c_acc))
     return
 
-  scheduler = torch.optim.lr_scheduler.LambdaLR(
+  #scheduler = torch.optim.lr_scheduler.LambdaLR(
+      #optimizer,
+      #lr_lambda=lambda step: get_lr(  # pylint: disable=g-long-lambda
+          #step,
+          #args.epochs * len(train_loader),
+          #1,  # lr_lambda computes multiplicative factor
+          #1e-6 / args.learning_rate))
+  scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
       optimizer,
-      lr_lambda=lambda step: get_lr(  # pylint: disable=g-long-lambda
-          step,
-          args.epochs * len(train_loader),
-          1,  # lr_lambda computes multiplicative factor
-          1e-6 / args.learning_rate))
+      args.epochs * len(train_loader))
+      
 
   if not os.path.exists(args.save):
     os.makedirs(args.save)
@@ -390,12 +417,18 @@ def main():
     f.write('epoch,time(s),train_loss,test_loss,test_error(%)\n')
 
   best_acc = 0
+
+  writer = SummaryWriter(args.save)
   print('Beginning training from epoch:', start_epoch + 1)
   for epoch in range(start_epoch, args.epochs):
     begin_time = time.time()
 
     train_loss_ema = train(net, train_loader, optimizer, scheduler)
     test_loss, test_acc = test(net, test_loader)
+
+    writer.add_scalar('Loss/train', train_loss_ema,epoch)
+    writer.add_scalar('Loss/test', test_loss, epoch)
+    writer.add_scalar('Loss/test_acc', test_acc, epoch)
 
     is_best = test_acc > best_acc
     best_acc = max(test_acc, best_acc)
@@ -408,7 +441,7 @@ def main():
         'optimizer': optimizer.state_dict(),
     }
 
-    save_path = os.path.join(args.save, 'checkpoint.pth.tar')
+    save_path = os.path.join(args.save, 'convnext_tiny_p_AO_checkpoint.pth.tar')
     torch.save(checkpoint, save_path)
     if is_best:
       shutil.copyfile(save_path, os.path.join(args.save, 'model_best.pth.tar'))
@@ -428,8 +461,10 @@ def main():
         .format((epoch + 1), int(time.time() - begin_time), train_loss_ema,
                 test_loss, 100 - 100. * test_acc))
 
+  writer.close()
   test_c_acc = test_c(net, test_data, base_c_path)
   print('Mean Corruption Error: {:.3f}'.format(100 - 100. * test_c_acc))
+
 
   with open(log_path, 'a') as f:
     f.write('%03d,%05d,%0.6f,%0.5f,%0.2f\n' %

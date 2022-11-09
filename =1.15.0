@@ -1,0 +1,2 @@
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: numpy in /cm/shared/apps/ml-pythondeps-py37-cuda11.2-gcc8/4.7.8/lib/python3.7/site-packages (1.19.5)

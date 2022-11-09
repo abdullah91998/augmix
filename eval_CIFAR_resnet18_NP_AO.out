@@ -1,0 +1,11 @@
+{'batch_size': 128, 'dataset': 'cifar10', 'decay': 0.0005, 'droprate': 0.0, 'epochs': 100, 'layers': 40, 'learning_rate': 0.1, 'model': 'resnet18', 'momentum': 0.9, 'ngpu': 1, 'prefetch': 2, 'pretrained': False, 'resume': '', 'save': './snapshots/adv', 'test': False, 'test_bs': 200, 'widen_factor': 2}
+Files already downloaded and verified
+Files already downloaded and verified
+{'batch_size': 128, 'dataset': 'cifar10', 'decay': 0.0005, 'droprate': 0.0, 'epochs': 100, 'layers': 40, 'learning_rate': 0.1, 'model': 'resnet18', 'momentum': 0.9, 'ngpu': 1, 'prefetch': 2, 'pretrained': False, 'resume': '', 'save': './snapshots/adv', 'test': False, 'test_bs': 200, 'widen_factor': 2}
+/home/g058466/vir_en/env2/lib/python3.7/site-packages/torchvision/models/_utils.py:209: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and will be removed in 0.15, please use 'weights' instead.
+  f"The parameter '{pretrained_param}' is deprecated since 0.13 and will be removed in 0.15, "
+/home/g058466/vir_en/env2/lib/python3.7/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and will be removed in 0.15. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+Error 89.6
+/cm/local/apps/slurm/var/spool/job1474608/slurm_script: line 17: 26643 Killed                  python cifar-p-eval.py -m resnet18
+slurmstepd: error: Detected 1 oom-kill event(s) in StepId=1474608.batch cgroup. Some of your processes may have been killed by the cgroup out-of-memory handler.
