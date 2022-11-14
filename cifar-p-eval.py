@@ -11,6 +11,8 @@ import torchvision.transforms as trn
 import torchvision.datasets as dset
 import torch.nn.functional as F
 from tqdm import tqdm
+import scipy
+import scipy.stats
 from third_party.WideResNet_pytorch.wideresnet import WideResNet
 from third_party.ResNeXt_DenseNet.models.resnext import resnext29
 from third_party.ResNeXt_DenseNet.models.densenet import densenet
@@ -49,9 +51,9 @@ parser.add_argument('--layers', default=40, type=int, help='total number of laye
 parser.add_argument('--widen-factor', default=2, type=int, help='widen factor')
 parser.add_argument('--droprate', default=0.0, type=float, help='dropout probability')
 # Checkpoints
-parser.add_argument('--save', '-s', type=str, default='./snapshots/adv', help='Folder to save checkpoints.')
-parser.add_argument('--resume', '-r', type=str, default='', help='Checkpoint path for resume / test.')
-#parser.add_argument('--load', '-l', type=str, default='./snapshots/augmix', help='Checkpoint path to resume / test.')
+parser.add_argument('--save', '-s', type=str, default='./snapshots/eval_files', help='Folder to save checkpoints.')
+parser.add_argument('--resume', '-r', type=str, default='/work/ws-tmp/g058466-comp_vis/augmix/snapshots/Expereiment8/', help='Checkpoint path for resume / test.')
+#parser.add_argument('--load', '-l', type=str, default='/work/ws-tmp/g058466-comp_vis/augmix/snapshots/Expereiment1', help='Checkpoint path to resume / test.')
 parser.add_argument('--test', '-t', action='store_true', help='Test only flag.')
 # Acceleration
 parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
@@ -249,7 +251,7 @@ from scipy.stats import rankdata
 c_p_dir =  'CIFAR-10-P' if num_classes == 10 else 'CIFAR-100-P'
 c_p_dir = '/work/ws-tmp/g058466-comp_vis/augmix/data/cifar/' + c_p_dir
 #c_p_dir = '/home/hendrycks/datasets/' + c_p_dir
-#/home/g059598/augmix/augmix/data/cifar/
+
 
 dummy_targets = torch.LongTensor(np.random.randint(0, num_classes, (10000,)))
 
@@ -291,9 +293,9 @@ for p in ['gaussian_noise', 'shot_noise', 'motion_blur', 'zoom_blur',
 
         print('\n' + p, 'Flipping Prob')
         print(current_flip)
-        print('Top5 Distance\t{:.5f}'.format(ranking_dist(ranks, True if 'noise' in p else False, mode='top5')))
-        print('Zipf Distance\t{:.5f}'.format(current_zipf))
+        #print('Top5 Distance\t{:.5f}'.format(ranking_dist(ranks, True if 'noise' in p else False, mode='top5')))
+        #print('Zipf Distance\t{:.5f}'.format(current_zipf))
 
 print(flip_list)
 print('\nMean Flipping Prob\t{:.5f}'.format(np.mean(flip_list)))
-print('Mean Zipf Distance\t{:.5f}'.format(np.mean(zipf_list)))
+#print('Mean Zipf Distance\t{:.5f}'.format(np.mean(zipf_list)))
