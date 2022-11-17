@@ -87,7 +87,7 @@ parser.add_argument(
     '--learning-rate',
     '-lr',
     type=float,
-    default=0.00005,
+    default=0.1,
     help='Initial learning rate.')
 parser.add_argument(
     '--batch-size', '-b', type=int, default=128, help='Batch size.')
@@ -97,7 +97,7 @@ parser.add_argument(
     '--decay',
     '-wd',
     type=float,
-    default=1e-8,
+    default=0.0005,
     help='Weight decay (L2 penalty).')
 # WRN Architecture options
 parser.add_argument(
@@ -136,7 +136,7 @@ parser.add_argument(
     '--save',
     '-s',
     type=str,
-    default='./snapshots/resnet18_NP_AO_again',
+    default='./snapshots/Expereiment9',
     help='Folder to save checkpoints.')
 parser.add_argument(
     '--resume',
@@ -166,7 +166,10 @@ CORRUPTIONS = [
     'jpeg_compression'
 ]
 
-
+PERTURBATIONS = [
+    'brightness','gaussian_noise','motion_blur', 'rotate',
+    'scale','shot_noise','spatter', 'tilt','translate','zoom_blur'
+]
 def get_lr(step, total_steps, lr_max, lr_min):
   """Compute learning rate according to cosine annealing schedule."""
   return lr_min + (lr_max - lr_min) * 0.5 * (1 +
@@ -309,7 +312,51 @@ def test_c(net, test_data, base_path):
 
   return np.mean(corruption_accs)
 
+"""Robustness(https://github.com/hendrycks/robustness/blob/master/ImageNet-P/cifar-p-eval.py)."""
+def flip_prob(predictions, noise_perturbation=False):
+    result = 0
+    step_size = 1
+    for vid_preds in predictions:
+        result_for_vid = []
 
+        for i in range(step_size):
+            prev_pred = vid_preds[i]
+
+            for pred in vid_preds[i::step_size][1:]:
+                result_for_vid.append(int(prev_pred != pred))
+                if not noise_perturbation: prev_pred = pred
+
+        result += np.mean(result_for_vid) / len(predictions)
+    return result
+
+"""Robustness(https://github.com/hendrycks/robustness/blob/master/ImageNet-P/cifar-p-eval.py)."""
+def test_p(net, base_path,num_classes):
+  """Evaluate network on given perturbated dataset."""
+  flip_list = []
+  for perturbation in PERTURBATIONS:
+    dataset = torch.from_numpy(np.float32(np.load(base_path + perturbation +'.npy').transpose((0,1,4,2,3))))/255.
+    loader = torch.utils.data.DataLoader(
+        dataset, batch_size=args.eval_batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+
+    predictions = []
+    with torch.no_grad():
+      for data in loader:
+          num_vids = data.size(0)
+          data = data.view(-1,3,32,32).cuda()
+
+          output = net(data * 2 - 1)
+
+          for vid in output.view(num_vids, -1, num_classes):
+              predictions.append(vid.argmax(1).to('cpu').numpy())
+      current_flip = flip_prob(predictions, True if 'noise' in perturbation else False)
+      flip_list.append(current_flip)
+      print('\n' + perturbation, 'Flipping Rate')
+      print(current_flip)
+    # log to Tensorboard
+    #if(tensorboard_summaryWriter):
+    #  tensorboard_summaryWriter.add_scalars(perturbation + '_p',{'flipping_rate':current_flip},global_step=1)
+    
+  return np.mean(flip_list)
 
 def main():
   torch.manual_seed(1)
@@ -330,6 +377,7 @@ def main():
     test_data = datasets.CIFAR10(
         './data/cifar', train=False, transform=test_transform, download=True)
     base_c_path = './data/cifar/CIFAR-10-C/'
+    base_p_path = './data/cifar/CIFAR-10-P/'
     num_classes = 10
   else:
     train_data = datasets.CIFAR100(
@@ -375,12 +423,13 @@ def main():
     net.classifier[2] = nn.Linear(in_features=net.classifier[2].in_features, out_features=num_classes, bias=True)
 
   #optimizer = torch.optim.SGD(
- # optimizer = torch.optim.AdamW(
-      #net.parameters(),
-      #lr=args.learning_rate,
+  #optimizer = torch.optim.AdamW(
+  #    net.parameters(),
+  #    lr=args.learning_rate,
       #momentum=args.momentum,
-      #weight_decay=args.decay,)
+  #    weight_decay=args.decay,)
       #nesterov=True)
+    # Optimizer
   if args.optimizer == 'sgd':
     optimizer = torch.optim.SGD(
         net.parameters(),
@@ -427,8 +476,9 @@ def main():
           #1,  # lr_lambda computes multiplicative factor
           #1e-6 / args.learning_rate))
   #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-      #optimizer,
+       #optimizer,
       #args.epochs * len(train_loader))
+      
   if args.scheduler == 'lambda':
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer,
@@ -442,8 +492,6 @@ def main():
       optimizer=optimizer,
       T_max=args.epochs * len(train_loader),
       eta_min= 1e-6 / args.learning_rate)
-      
-
   if not os.path.exists(args.save):
     os.makedirs(args.save)
   if not os.path.isdir(args.save):
@@ -479,7 +527,7 @@ def main():
         'optimizer': optimizer.state_dict(),
     }
 
-    save_path = os.path.join(args.save, 'resnet18_NP_AO_checkpoint.pth.tar')
+    save_path = os.path.join(args.save, 'resnet18_P_SGD_checkpoint.pth.tar')
     torch.save(checkpoint, save_path)
     if is_best:
       shutil.copyfile(save_path, os.path.join(args.save, 'model_best.pth.tar'))
@@ -502,7 +550,10 @@ def main():
   writer.close()
   test_c_acc = test_c(net, test_data, base_c_path)
   print('Mean Corruption Error: {:.3f}'.format(100 - 100. * test_c_acc))
-
+  
+  if args.dataset == 'cifar10':
+    test_fp = test_p(net, base_p_path,num_classes)
+    print('Mean Perturbation Flipping Rate: {:.3f}'.format(test_fp))
 
   with open(log_path, 'a') as f:
     f.write('%03d,%05d,%0.6f,%0.5f,%0.2f\n' %

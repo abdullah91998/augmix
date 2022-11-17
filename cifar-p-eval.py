@@ -52,7 +52,7 @@ parser.add_argument('--widen-factor', default=2, type=int, help='widen factor')
 parser.add_argument('--droprate', default=0.0, type=float, help='dropout probability')
 # Checkpoints
 parser.add_argument('--save', '-s', type=str, default='./snapshots/eval_files', help='Folder to save checkpoints.')
-parser.add_argument('--resume', '-r', type=str, default='/work/ws-tmp/g058466-comp_vis/augmix/snapshots/Expereiment8/', help='Checkpoint path for resume / test.')
+parser.add_argument('--resume', '-r', type=str, default='/work/ws-tmp/g058466-comp_vis/augmix/snapshots/convnext_tiny_P_AO_again/', help='Checkpoint path for resume / test.')
 #parser.add_argument('--load', '-l', type=str, default='/work/ws-tmp/g058466-comp_vis/augmix/snapshots/Expereiment1', help='Checkpoint path to resume / test.')
 parser.add_argument('--test', '-t', action='store_true', help='Test only flag.')
 # Acceleration
@@ -249,7 +249,7 @@ from tqdm import tqdm
 from scipy.stats import rankdata
 #/work/ws-tmp/g058466-comp_vis/augmix/data
 c_p_dir =  'CIFAR-10-P' if num_classes == 10 else 'CIFAR-100-P'
-c_p_dir = '/work/ws-tmp/g058466-comp_vis/augmix/data/cifar/' + c_p_dir
+c_p_dir = '/work/ws-tmp/g058466-comp_vis1/g058466-comp_vis-1668643802/augmix/data/cifar/' + c_p_dir
 #c_p_dir = '/home/hendrycks/datasets/' + c_p_dir
 
 
